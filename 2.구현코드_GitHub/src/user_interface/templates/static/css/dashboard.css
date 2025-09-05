@@ -1,0 +1,603 @@
+/* HyurimBot 관리자 대시보드 스타일 */
+
+body {
+    background-color: #f8f9fa;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.container-fluid {
+    padding: 20px;
+}
+
+/* 카드 스타일 개선 */
+.card {
+    border: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border-radius: 12px;
+    transition: box-shadow 0.3s ease;
+}
+
+.card:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.card-header {
+    background-color: #fff;
+    border-bottom: 2px solid #f8f9fa;
+    border-radius: 12px 12px 0 0 !important;
+    font-weight: 600;
+}
+
+/* 버튼 스타일 */
+.btn {
+    border-radius: 8px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.btn-success {
+    background: linear-gradient(45deg, #28a745, #20c997);
+    border: none;
+}
+
+.btn-success:hover {
+    background: linear-gradient(45deg, #218838, #1aa085);
+    transform: translateY(-1px);
+}
+
+.btn-info {
+    background: linear-gradient(45deg, #17a2b8, #20c997);
+    border: none;
+}
+
+.btn-info:hover {
+    background: linear-gradient(45deg, #138496, #1aa085);
+    transform: translateY(-1px);
+}
+
+/* 테이블 스타일 */
+.table {
+    margin-bottom: 0;
+}
+
+.table thead th {
+    background-color: #f8f9fa;
+    border-top: none;
+    font-weight: 600;
+    color: #495057;
+    font-size: 0.9rem;
+    padding: 12px;
+}
+
+.table tbody td {
+    padding: 12px;
+    vertical-align: middle;
+    border-top: 1px solid #f8f9fa;
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(0, 123, 255, 0.05);
+}
+
+/* 탭 스타일 */
+.nav-tabs {
+    border-bottom: 2px solid #f8f9fa;
+}
+
+.nav-tabs .nav-link {
+    border: none;
+    color: #6c757d;
+    font-weight: 500;
+    padding: 12px 20px;
+    border-radius: 8px 8px 0 0;
+    margin-right: 4px;
+    transition: all 0.3s ease;
+}
+
+.nav-tabs .nav-link:hover {
+    background-color: #f8f9fa;
+    color: #495057;
+}
+
+.nav-tabs .nav-link.active {
+    background-color: #fff;
+    color: #007bff;
+    border-bottom: 3px solid #007bff;
+    font-weight: 600;
+}
+
+/* 상태 배지 */
+.badge {
+    font-size: 0.75rem;
+    padding: 4px 8px;
+    border-radius: 6px;
+}
+
+.badge-basic {
+    background-color: #ffc107;
+    color: #212529;
+}
+
+.badge-detailed {
+    background-color: #28a745;
+    color: white;
+}
+
+.badge-empty {
+    background-color: #6c757d;
+    color: white;
+}
+
+/* 폼 요소 스타일 */
+.form-select, .form-control {
+    border-radius: 8px;
+    border: 2px solid #e9ecef;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.form-select:focus, .form-control:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+/* 로딩 상태 */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(255, 255, 255, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+/* 알림 스타일 */
+.alert {
+    border: none;
+    border-radius: 8px;
+    font-weight: 500;
+}
+
+.alert-success {
+    background: linear-gradient(45deg, #d4edda, #c3e6cb);
+    color: #155724;
+}
+
+.alert-danger {
+    background: linear-gradient(45deg, #f8d7da, #f5c6cb);
+    color: #721c24;
+}
+
+.alert-warning {
+    background: linear-gradient(45deg, #fff3cd, #ffeeba);
+    color: #856404;
+}
+
+.alert-info {
+    background: linear-gradient(45deg, #d1ecf1, #bee5eb);
+    color: #0c5460;
+}
+
+/* 크롤링 상태 표시 */
+#crawlStatus {
+    border-radius: 8px;
+    animation: fadeIn 0.5s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* 레이아웃 최적화 */
+.col-md-3 .card-body {
+    padding: 15px 12px;
+}
+
+.col-md-3 .form-select,
+.col-md-3 .form-label {
+    font-size: 0.9rem;
+}
+
+.col-md-3 .btn {
+    font-size: 0.9rem;
+    padding: 10px 8px;
+}
+
+/* 데이터 표시 영역 최적화 */
+.col-md-9 .table-responsive {
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+/* 반응형 디자인 */
+@media (max-width: 768px) {
+    .container-fluid {
+        padding: 10px;
+    }
+    
+    /* 모바일에서는 세로 레이아웃 */
+    .col-md-3,
+    .col-md-9 {
+        width: 100%;
+        max-width: 100%;
+    }
+    
+    .card-body {
+        padding: 15px;
+    }
+    
+    .table-responsive {
+        font-size: 0.875rem;
+    }
+    
+    .btn {
+        font-size: 0.875rem;
+        padding: 8px 12px;
+    }
+    
+    h1 {
+        font-size: 1.5rem;
+    }
+}
+
+/* 태블릿 크기에서 레이아웃 조정 */
+@media (min-width: 769px) and (max-width: 1024px) {
+    .col-md-3 .btn {
+        font-size: 0.85rem;
+        padding: 8px 6px;
+    }
+    
+    .col-md-3 .form-select {
+        font-size: 0.85rem;
+    }
+}
+
+/* 스크롤바 스타일 */
+.table-responsive::-webkit-scrollbar {
+    height: 8px;
+}
+
+.table-responsive::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 10px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* 헤더 그라데이션 */
+.bg-primary {
+    background: linear-gradient(135deg, #007bff, #6610f2) !important;
+}
+
+/* 애니메이션 효과 */
+.card {
+    animation: slideUp 0.6s ease;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* 포커스 스타일 개선 */
+.btn:focus,
+.form-select:focus,
+.form-control:focus {
+    outline: none;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+/* 가격 표시 스타일 */
+.price-cell {
+    font-weight: 600;
+    color: #28a745;
+}
+
+.price-zero {
+    color: #6c757d;
+    font-style: italic;
+}
+
+/* 업데이트 시간 스타일 */
+.update-time {
+    font-size: 0.8rem;
+    color: #6c757d;
+}
+
+/* 상태 인디케이터 */
+.status-indicator {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 8px;
+}
+
+.status-success { background-color: #28a745; }
+.status-warning { background-color: #ffc107; }
+.status-danger { background-color: #dc3545; }
+.status-info { background-color: #17a2b8; }
+
+/* 편의시설 셀 스타일 */
+.amenities-cell {
+    font-size: 0.85rem;
+    color: #495057;
+    max-width: 150px;
+}
+
+.amenities-cell small {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 테이블 컬럼 폭 조정 */
+.table th:nth-child(1) { width: 12%; } /* 휴양림 */
+.table th:nth-child(2) { width: 8%; }  /* 시설유형 */
+.table th:nth-child(3) { width: 15%; } /* 시설명 */
+.table th:nth-child(4) { width: 15%; } /* 객실명 */
+.table th:nth-child(5) { width: 8%; }  /* 수용인원 */
+.table th:nth-child(6) { width: 8%; }  /* 면적 */
+.table th:nth-child(7) { width: 10%; } /* 평일가격 */
+.table th:nth-child(8) { width: 10%; } /* 주말가격 */
+.table th:nth-child(9) { width: 12%; } /* 편의시설 */
+.table th:nth-child(10) { width: 8%; } /* 데이터상태 */
+.table th:nth-child(11) { width: 10%; } /* 업데이트 */
+
+/* 테이블 헤더 텍스트 크기 조정 */
+.table thead th {
+    font-size: 0.85rem;
+    padding: 8px 6px;
+    text-align: center;
+}
+
+.table tbody td {
+    font-size: 0.85rem;
+    padding: 8px 6px;
+    text-align: center;
+}
+
+/* 시설유형 배지 크기 조정 */
+.badge.bg-secondary {
+    font-size: 0.7rem;
+    padding: 2px 6px;
+}
+
+/* 자연휴양림 탭 전용 스타일 */
+#forests-pane .table {
+    font-size: 0.8rem;
+}
+
+#forests-pane .table thead th {
+    font-size: 0.75rem;
+    padding: 6px 4px;
+    text-align: center;
+    white-space: nowrap;
+}
+
+#forests-pane .table tbody td {
+    font-size: 0.75rem;
+    padding: 8px 4px;
+    vertical-align: middle;
+}
+
+/* 자연휴양림 테이블 컬럼별 스타일 */
+.entrance-fee, .facilities, .address, .homepage, .coordinates, .data-date, .provider {
+    font-size: 0.7rem;
+}
+
+.entrance-fee small, .facilities small, .address small {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 120px;
+}
+
+.coordinates small {
+    font-size: 0.65rem;
+    color: #6c757d;
+}
+
+/* 자연휴양림 탭 반응형 */
+@media (max-width: 1200px) {
+    #forests-pane .table {
+        font-size: 0.7rem;
+    }
+    
+    #forests-pane .entrance-fee small,
+    #forests-pane .facilities small,
+    #forests-pane .address small {
+        max-width: 80px;
+    }
+}
+
+/* 숙박시설 탭 전용 스타일 */
+#accommodations-pane .table {
+    font-size: 0.75rem;
+    table-layout: fixed;
+    width: 100%;
+}
+
+#accommodations-pane .table thead th {
+    font-size: 0.7rem;
+    padding: 8px 3px;
+    text-align: center;
+    white-space: nowrap;
+    background-color: #f8f9fa;
+    border-bottom: 2px solid #dee2e6;
+    font-weight: 600;
+}
+
+#accommodations-pane .table tbody td {
+    font-size: 0.75rem;
+    padding: 8px 3px;
+    vertical-align: middle;
+    text-align: center;
+    border-top: 1px solid #f0f0f0;
+}
+
+/* 숙박시설 테이블 컬럼별 스타일 */
+.forest-name, .facility-name {
+    font-weight: 600;
+    color: #495057;
+}
+
+.capacity-standard, .capacity-maximum {
+    font-weight: 500;
+    color: #6c757d;
+}
+
+.area-sqm, .area-pyeong {
+    font-weight: 500;
+    color: #6c757d;
+    font-size: 0.8rem;
+}
+
+.checkin-time, .checkout-time {
+    font-weight: 500;
+    color: #17a2b8;
+}
+
+.room-composition small, .booking-rules small {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 150px;
+    color: #6c757d;
+}
+
+.amenities-cell small {
+    max-width: 120px;
+    color: #495057;
+}
+
+/* 이용안내 컬럼 스타일 */
+.usage-info {
+    font-size: 0.75rem;
+    color: #495057;
+    max-width: 150px;
+}
+
+.usage-info small {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.2;
+}
+
+/* 가격 컬럼 스타일링 개선 */
+.price-off-weekday, .price-off-weekend, .price-peak-weekday, .price-peak-weekend {
+    font-size: 0.7rem;
+    padding: 2px 4px;
+    border-radius: 4px;
+}
+
+.price-cell {
+    font-weight: 600;
+    color: #28a745;
+    background-color: #f8fff9;
+}
+
+.price-zero {
+    color: #6c757d;
+    font-style: italic;
+    background-color: #f8f9fa;
+}
+
+/* 숙박시설 테이블 컬럼 폭 조정 (18개 컬럼) */
+#accommodations-pane .table th:nth-child(1) { width: 7%; }   /* 휴양림 */
+#accommodations-pane .table th:nth-child(2) { width: 5%; }   /* 시설유형 */
+#accommodations-pane .table th:nth-child(3) { width: 9%; }   /* 시설물명 */
+#accommodations-pane .table th:nth-child(4) { width: 4%; }   /* 기준인원 */
+#accommodations-pane .table th:nth-child(5) { width: 4%; }   /* 최대인원 */
+#accommodations-pane .table th:nth-child(6) { width: 4%; }   /* 면적(㎡) */
+#accommodations-pane .table th:nth-child(7) { width: 4%; }   /* 면적(평) */
+#accommodations-pane .table th:nth-child(8) { width: 5%; }   /* 입실시간 */
+#accommodations-pane .table th:nth-child(9) { width: 5%; }   /* 퇴실시간 */
+#accommodations-pane .table th:nth-child(10) { width: 6%; }  /* 비수기평일 */
+#accommodations-pane .table th:nth-child(11) { width: 6%; }  /* 비수기주말 */
+#accommodations-pane .table th:nth-child(12) { width: 6%; }  /* 성수기평일 */
+#accommodations-pane .table th:nth-child(13) { width: 6%; }  /* 성수기주말 */
+#accommodations-pane .table th:nth-child(14) { width: 10%; } /* 편의시설 */
+#accommodations-pane .table th:nth-child(15) { width: 12%; } /* 이용안내 */
+#accommodations-pane .table th:nth-child(16) { width: 5%; }  /* 데이터상태 */
+#accommodations-pane .table th:nth-child(17) { width: 6%; }  /* 상세데이터수집 */
+#accommodations-pane .table th:nth-child(18) { width: 7%; }  /* 업데이트 */
+
+/* 숙박시설 탭 반응형 */
+@media (max-width: 1600px) {
+    #accommodations-pane .table {
+        font-size: 0.7rem;
+    }
+    
+    #accommodations-pane .table thead th {
+        font-size: 0.65rem;
+        padding: 6px 2px;
+    }
+    
+    #accommodations-pane .table tbody td {
+        font-size: 0.7rem;
+        padding: 6px 2px;
+    }
+    
+    .amenities-cell small, 
+    .usage-info small {
+        max-width: 100px;
+    }
+}
+
+@media (max-width: 1200px) {
+    #accommodations-pane .table {
+        font-size: 0.65rem;
+    }
+    
+    #accommodations-pane .table thead th {
+        font-size: 0.6rem;
+        padding: 4px 1px;
+    }
+    
+    #accommodations-pane .table tbody td {
+        font-size: 0.65rem;
+        padding: 4px 1px;
+    }
+    
+    .amenities-cell small, 
+    .usage-info small {
+        max-width: 80px;
+    }
+}
+
+/* 테이블 스크롤 영역 스타일 개선 */
+#accommodations-pane .table-responsive {
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+/* 상태 배지 스타일 개선 */
+#accommodations-pane .badge {
+    font-size: 0.65rem;
+    padding: 3px 6px;
+    border-radius: 4px;
+}

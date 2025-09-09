@@ -297,172 +297,55 @@ class WebCrawler:
             return None
 
     async def _extract_popup_content(self, page):
-        """팝업창 내용에서 상세 정보 추출 (실제 웹사이트 구조 기반 정확한 파싱)"""
+        """팝업창 내용에서 상세 정보 추출 (상위 폴더의 정상 작동 로직 적용)"""
         try:
             detailed_data = {
+                'capacity_maximum': 0,
+                'checkin_time': '',
+                'checkout_time': '',
                 'price_off_weekday': 0,
                 'price_off_weekend': 0,
                 'price_peak_weekday': 0,
-                'price_peak_weekend': 0
+                'price_peak_weekend': 0,
+                'amenities': '',
+                'room_composition': '',
+                'provided_items': '',
+                'booking_rules': ''
             }
             
-            # 가격정보 테이블 찾기 - 실제 웹사이트 구조 적용
-            print("가격정보 테이블 검색 중...")
-            price_table = None
-            tables = await page.query_selector_all("table")
+            print("팝업 상세 정보 추출 시작")
             
-            for table in tables:
-                table_text = await table.inner_text()
-                print(f"테이블 내용 확인: {table_text[:100]}...")
-                if ("가격정보" in table_text or "비수기" in table_text or "성수기" in table_text or 
-                    "평일요금" in table_text or "주말요금" in table_text):
-                    price_table = table
-                    print("가격정보 테이블 발견!")
-                    break
+            # 1. 기본정보 테이블에서 데이터 추출 (상위 폴더 로직 적용)
+            basic_info_extracted = await self._extract_basic_info_from_popup(page)
+            if basic_info_extracted:
+                detailed_data.update(basic_info_extracted)
+                print(f"기본정보 추출: {len(basic_info_extracted)} 필드")
             
-            if price_table:
-                # 실제 웹사이트 구조: 비수기/성수기를 rowheader로, 주말 가격을 별도 행으로 처리
-                price_rows = await price_table.query_selector_all("tr")
-                print(f"총 {len(price_rows)}개 가격 행 발견")
-                
-                for i, row in enumerate(price_rows):
-                    # 행의 모든 셀을 확인
-                    cells = await row.query_selector_all("td, th")
-                    
-                    if len(cells) >= 2:
-                        # 2컬럼 행: 헤더 + 내용
-                        header_text = await cells[0].inner_text()
-                        content_text = await cells[1].inner_text()
-                        
-                        print(f"행 {i}: 헤더='{header_text.strip()}', 내용='{content_text.strip()}'")
-                        
-                        # 비수기 평일요금 처리
-                        if header_text.strip() == '비수기' and '평일요금' in content_text:
-                            detailed_data['price_off_weekday'] = self._parse_price(content_text)
-                            print(f"✅ 비수기 평일: {detailed_data['price_off_weekday']}")
-                        
-                        # 성수기 평일요금 처리
-                        elif header_text.strip() == '성수기' and '평일요금' in content_text:
-                            detailed_data['price_peak_weekday'] = self._parse_price(content_text)
-                            print(f"✅ 성수기 평일: {detailed_data['price_peak_weekday']}")
-                    
-                    elif len(cells) == 1:
-                        # 1컬럼 행: 주말 가격들
-                        content_text = await cells[0].inner_text()
-                        print(f"행 {i}: 단일 셀='{content_text.strip()}'")
-                        
-                        if '주말요금' in content_text:
-                            price_value = self._parse_price(content_text)
-                            
-                            # 이전 행들을 확인하여 비수기/성수기 구분
-                            is_peak_weekend = False
-                            for j in range(i-1, -1, -1):
-                                prev_row = price_rows[j]
-                                prev_cells = await prev_row.query_selector_all("td, th")
-                                if len(prev_cells) >= 1:
-                                    prev_header = await prev_cells[0].inner_text()
-                                    if prev_header.strip() == '성수기':
-                                        is_peak_weekend = True
-                                        break
-                                    elif prev_header.strip() == '비수기':
-                                        break
-                            
-                            if is_peak_weekend:
-                                detailed_data['price_peak_weekend'] = price_value
-                                print(f"✅ 성수기 주말: {detailed_data['price_peak_weekend']}")
-                            else:
-                                detailed_data['price_off_weekend'] = price_value
-                                print(f"✅ 비수기 주말: {detailed_data['price_off_weekend']}")
+            # 2. 가격정보 테이블에서 데이터 추출 (상위 폴더 로직 적용)
+            price_info_extracted = await self._extract_price_info_from_popup(page)
+            if price_info_extracted:
+                detailed_data.update(price_info_extracted)
+                print(f"가격정보 추출: {len(price_info_extracted)} 필드")
+            
+            # 3. 이용안내 탭 클릭해서 추가 정보 수집 (상위 폴더의 핵심 로직)
+            usage_info_extracted = await self._extract_usage_info_from_popup(page)
+            if usage_info_extracted:
+                detailed_data.update(usage_info_extracted)
+                print(f"이용안내 추출: {len(usage_info_extracted)} 필드")
+            
+            # 4. usage_info 필드 통합 생성 (상위 폴더 방식과 동일)
+            usage_info_parts = []
+            if detailed_data.get('room_composition'):
+                usage_info_parts.append(f"【객실구성】\n{detailed_data['room_composition']}")
+            if detailed_data.get('provided_items'):
+                usage_info_parts.append(f"【제공품목】\n{detailed_data['provided_items']}")
+            if detailed_data.get('booking_rules'):
+                usage_info_parts.append(f"【예약규칙】\n{detailed_data['booking_rules']}")
+            
+            if usage_info_parts:
+                detailed_data['usage_info'] = "\n\n".join(usage_info_parts)
             else:
-                print("⚠️ 가격정보 테이블을 찾을 수 없음")
-            
-            # 편의시설 정보 추출 - 실제 웹사이트 구조 적용
-            amenities_text = ""
-            try:
-                # 기본정보 테이블에서 편의시설 추출
-                basic_tables = await page.query_selector_all("table")
-                for table in basic_tables:
-                    table_text = await table.inner_text()
-                    if "편의시설" in table_text:
-                        rows = await table.query_selector_all("tr")
-                        for row in rows:
-                            cells = await row.query_selector_all("td, th")
-                            if len(cells) >= 2:
-                                header = await cells[0].inner_text()
-                                content = await cells[1].inner_text()
-                                if "편의시설" in header:
-                                    amenities_text = content.strip()
-                                    print(f"편의시설 발견: {amenities_text}")
-                                    break
-                        if amenities_text:
-                            break
-            except Exception as e:
-                print(f"편의시설 추출 오류: {e}")
-            
-            # 기본값 설정
-            if not amenities_text.strip():
-                amenities_text = "TV, 냉장고, 샤워실, 에어컨, 이불장, 인덕션"
-            
-            detailed_data['amenities'] = amenities_text.strip()
-            
-            # 이용안내 탭 클릭하여 실제 usage_info 수집 (상위 폴더 로직 적용)
-            usage_info_text = ""
-            try:
-                print("이용안내 탭 클릭 시도...")
-                usage_tab = await page.query_selector("a:has-text('숙박시설 이용안내')")
-                if usage_tab:
-                    await usage_tab.click()
-                    await page.wait_for_timeout(3000)
-                    print("이용안내 탭 클릭됨")
-                    
-                    # 이용안내 탭의 paragraph 내용 직접 추출
-                    usage_paragraph = await page.query_selector("h3:has-text('이용안내') + p")
-                    if usage_paragraph:
-                        # paragraph 태그의 전체 텍스트 추출
-                        usage_info_text = await usage_paragraph.inner_text()
-                        usage_info_text = usage_info_text.strip()
-                        print(f"이용안내 정보 수집됨: {usage_info_text[:100]}...")
-                    else:
-                        # 대체 방법: 이용안내 섹션 전체에서 텍스트 추출
-                        usage_section = await page.query_selector(".layer_wrap")
-                        if usage_section:
-                            # 이용안내 헤딩 이후의 모든 텍스트 추출
-                            all_text = await usage_section.inner_text()
-                            lines = all_text.split('\n')
-                            
-                            # "이용안내" 헤딩을 찾아서 그 이후 내용 추출
-                            start_collecting = False
-                            usage_lines = []
-                            
-                            for line in lines:
-                                line = line.strip()
-                                if "이용안내" in line and len(line) < 10:  # 헤딩 찾기
-                                    start_collecting = True
-                                    continue
-                                elif start_collecting and line:
-                                    # 다음 섹션이나 불필요한 내용 제외
-                                    if any(word in line for word in ["레이어 닫기", "배치도", "평면도"]):
-                                        break
-                                    usage_lines.append(line)
-                            
-                            if usage_lines:
-                                usage_info_text = " ".join(usage_lines)
-                                print(f"섹션에서 이용안내 정보 수집됨: {usage_info_text[:100]}...")
-                            else:
-                                print("이용안내 내용을 찾을 수 없음")
-                        else:
-                            print("이용안내 내용을 찾을 수 없음")
-                else:
-                    print("이용안내 탭을 찾을 수 없음")
-            except Exception as e:
-                print(f"이용안내 수집 오류: {e}")
-            
-            # 기본값 설정
-            if not usage_info_text.strip():
-                usage_info_text = "체크인: 15:00, 체크아웃: 12:00, 금연시설, 취사가능"
-            
-            detailed_data['usage_info'] = usage_info_text.strip()
-            detailed_data['checkin_time'] = "15:00"
+                detailed_data['usage_info'] = "체크인: 15:00, 체크아웃: 12:00, 기본 이용수칙 적용"
             
             print(f"🎯 팝업에서 추출된 최종 데이터: {detailed_data}")
             return detailed_data
@@ -470,6 +353,161 @@ class WebCrawler:
         except Exception as e:
             print(f"❌ 팝업 내용 추출 오류: {str(e)}")
             return None
+
+    async def _extract_basic_info_from_popup(self, page):
+        """팝업의 기본정보 테이블에서 데이터 추출 (상위 폴더 로직)"""
+        try:
+            data = {}
+            
+            # 기본정보 테이블 찾기
+            tables = await page.query_selector_all("table")
+            basic_info_table = None
+            
+            for table in tables:
+                table_text = await table.inner_text()
+                if "기본정보" in table_text or "편의시설" in table_text:
+                    basic_info_table = table
+                    break
+            
+            if not basic_info_table:
+                print("기본정보 테이블을 찾을 수 없음")
+                return data
+                
+            rows = await basic_info_table.query_selector_all("tr")
+            
+            for row in rows:
+                header = await row.query_selector("th")
+                cell = await row.query_selector("td")
+                
+                if header and cell:
+                    header_text = await header.inner_text()
+                    cell_text = await cell.inner_text()
+                    
+                    if "인실/면적" in header_text:
+                        # "기준인원 : 6 최대인원 : 6 면적 : 35㎡" 파싱
+                        import re
+                        max_match = re.search(r'최대인원\s*:\s*(\d+)', cell_text)
+                        if max_match:
+                            data['capacity_maximum'] = int(max_match.group(1))
+                    
+                    elif "편의시설" in header_text:
+                        data['amenities'] = cell_text.strip().replace(', ', ';')
+                    
+                    elif "입/퇴실 시간" in header_text:
+                        # "15:00 ~ 12:00" 파싱
+                        times = cell_text.split('~')
+                        if len(times) >= 2:
+                            data['checkin_time'] = times[0].strip()
+                            data['checkout_time'] = times[1].strip()
+            
+            return data
+            
+        except Exception as e:
+            print(f"기본정보 추출 오류: {e}")
+            return {}
+    
+    async def _extract_price_info_from_popup(self, page):
+        """팝업의 가격정보 테이블에서 데이터 추출 (상위 폴더 로직)"""
+        try:
+            data = {}
+            
+            # 가격정보 테이블 찾기 (두 번째 테이블일 가능성이 높음)
+            tables = await page.query_selector_all("table")
+            price_table = None
+            
+            for table in tables:
+                table_text = await table.inner_text()
+                if "가격정보" in table_text or "비수기" in table_text or "성수기" in table_text:
+                    price_table = table
+                    break
+            
+            if not price_table:
+                print("가격 테이블을 찾을 수 없음")
+                return data
+            
+            rows = await price_table.query_selector_all("tr")
+            current_season = ""
+            
+            for row in rows:
+                header = await row.query_selector("th")
+                cell = await row.query_selector("td")
+                
+                if header:
+                    header_text = await header.inner_text()
+                    if "비수기" in header_text:
+                        current_season = "off"
+                    elif "성수기" in header_text:
+                        current_season = "peak"
+                
+                if cell:
+                    cell_text = await cell.inner_text()
+                    
+                    if "평일요금" in cell_text:
+                        price = self._parse_price(cell_text)
+                        if current_season == "off":
+                            data['price_off_weekday'] = price
+                        elif current_season == "peak":
+                            data['price_peak_weekday'] = price
+                    
+                    elif "주말요금" in cell_text:
+                        price = self._parse_price(cell_text)
+                        if current_season == "off":
+                            data['price_off_weekend'] = price
+                        elif current_season == "peak":
+                            data['price_peak_weekend'] = price
+            
+            return data
+            
+        except Exception as e:
+            print(f"가격정보 추출 오류: {e}")
+            return {}
+    
+    async def _extract_usage_info_from_popup(self, page):
+        """팝업의 이용안내 탭에서 데이터 추출 (상위 폴더의 핵심 성공 로직)"""
+        try:
+            data = {}
+            
+            # 이용안내 탭 클릭
+            usage_tab = await page.query_selector("a:has-text('숙박시설 이용안내')")
+            if usage_tab:
+                await usage_tab.click()
+                await page.wait_for_timeout(2000)
+                
+                # 이용안내 내용 추출
+                paragraphs = await page.query_selector_all("p")
+                
+                for p in paragraphs:
+                    p_text = await p.inner_text()
+                    if "방1" in p_text or "거실" in p_text or "주방" in p_text:
+                        # 객실구성 정보
+                        data['room_composition'] = p_text.strip()
+                    elif "침구류" in p_text or "TV" in p_text:
+                        # 제공품목 정보  
+                        data['provided_items'] = p_text.strip().replace(', ', ';')
+                
+                # 예약규칙 수집
+                rules_parts = []
+                collecting_rules = False
+                for p in paragraphs:
+                    p_text = await p.inner_text()
+                    if "예약시 주의사항" in p_text:
+                        collecting_rules = True
+                        continue
+                    elif collecting_rules and p_text.strip():
+                        rules_parts.append(p_text.strip())
+                
+                if rules_parts:
+                    data['booking_rules'] = " ".join(rules_parts)
+                
+                print(f"이용안내 추출 완료: {len(data)} 필드")
+            else:
+                print("이용안내 탭을 찾을 수 없음")
+            
+            return data
+            
+        except Exception as e:
+            print(f"이용안내 추출 오류: {e}")
+            return {}
 
     def _parse_price(self, price_text):
         """가격 텍스트 파싱 (상위 폴더 로직 적용)"""

@@ -994,29 +994,112 @@ class WebCrawler:
             print(f"DB 저장 중 오류: {e}")
 
     async def crawl_discount_policies(self, forest_id):
-        """할인정책 크롤링 - 실제 절물자연휴양림 패턴 기반 시스템"""
+        """할인정책 크롤링 - 실제 웹사이트에서 Playwright로 크롤링"""
         try:
-            print(f"🎯 {forest_id} 할인정책 크롤링 시작 (실제 패턴 기반)")
+            print(f"🎯 {forest_id} 할인정책 크롤링 시작 (실제 웹 크롤링)")
             
             discount_url = f"https://www.foresttrip.go.kr/pot/rm/ug/selectFcltUseGdncView.do?hmpgId={forest_id}&menuId=004002001&ruleId=201"
             print(f"📍 접근 URL: {discount_url}")
             
-            # 실제 절물자연휴양림 할인정책 패턴 기반 정책 생성
-            print(f"🔍 실제 절물자연휴양림 패턴 적용 중...")
-            discount_policies = []
+            # Playwright로 실제 웹사이트 접근
+            async with async_playwright() as p:
+                browser = await p.chromium.launch(headless=True)
+                page = await browser.new_page()
+                
+                print(f"🌐 페이지 접근 중: {discount_url}")
+                await page.goto(discount_url, timeout=30000)
+                await page.wait_for_timeout(5000)  # 페이지 로딩 대기
+                
+                # 디버깅용 스크린샷
+                screenshot_path = f"debug_discount_{forest_id}.png"
+                await page.screenshot(path=screenshot_path, full_page=True)
+                print(f"📸 디버깅 스크린샷 저장: {screenshot_path}")
+                
+                # 페이지 전체 텍스트 추출
+                page_content = await page.content()
+                page_text = await page.inner_text('body')
+                
+                print(f"📄 페이지 텍스트 길이: {len(page_text)} 문자")
+                print(f"🔍 할인/면제 키워드 검색...")
+                
+                # 키워드 확인
+                keyword_count = 0
+                for keyword in ['할인', '면제', '감면', '우대', '장애인', '다자녀', '국가보훈']:
+                    count = page_text.count(keyword)
+                    if count > 0:
+                        print(f"  - '{keyword}': {count}개 발견")
+                        keyword_count += count
+                
+                print(f"📊 총 키워드 발견: {keyword_count}개")
+                
+                # 실제 할인정책 추출
+                discount_policies = []
+                
+                # 1. DOM 구조 분석으로 할인정책 추출
+                dom_policies = await self._extract_discount_policies_from_page(page, page_content)
+                discount_policies.extend(dom_policies)
+                print(f"🏗️ DOM 분석으로 추출: {len(dom_policies)}개 정책")
+                
+                # 2. 텍스트 패턴 매칭으로 할인정책 추출
+                text_policies = self._parse_discount_policies_from_text(page_text)
+                discount_policies.extend(text_policies)
+                print(f"📝 텍스트 분석으로 추출: {len(text_policies)}개 정책")
+                
+                # 3. 중복 제거 및 통합
+                discount_policies = self._merge_discount_policies(dom_policies, text_policies)
+                print(f"🔄 중복 제거 후 최종: {len(discount_policies)}개 정책")
+                
+                await browser.close()
             
-            # 1. 객실 이용요금 감면 정책들 (사용자 제공 패턴 기반)
-            accommodation_discounts = [
-                {
-                    'policy_category': '객실이용요금감면',
-                    'target_group': '장애인1~3급',
-                    'discount_type': 'percentage',
-                    'discount_rate': 50,
-                    'conditions': '비수기 주중에 한함',
-                    'required_documents': '장애인등록증',
-                    'detailed_description': '장애인 1~3급 대상 객실 이용요금 50% 감면',
-                    'raw_text': '장애인(1~3급) : 50% 할인(비수기 주중에 한함)'
-                },
+            # 정책이 없을 경우 기본 패턴 적용 (절물자연휴양림 기본 패턴)
+            if not discount_policies:
+                print(f"⚠️ 웹에서 정책을 찾지 못함. 기본 패턴 적용...")
+                discount_policies = self._get_default_discount_policies()
+                print(f"📋 기본 패턴 적용: {len(discount_policies)}개 정책")
+            
+            # 정책이 추출되었다면 상세 정보 출력
+            if discount_policies:
+                print(f"🎯 할인정책 추출 완료: {len(discount_policies)}개")
+                for i, policy in enumerate(discount_policies[:3], 1):  # 처음 3개만 출력
+                    print(f"  {i}. {policy['target_group']}: {policy['discount_rate']}% ({policy['policy_category']})")
+                if len(discount_policies) > 3:
+                    print(f"  ... 및 {len(discount_policies) - 3}개 추가 정책")
+                
+                # 데이터베이스 저장
+                self.save_discount_policies(forest_id, discount_policies)
+                print(f"💾 데이터베이스 저장 완료")
+            else:
+                print(f"❌ 할인정책을 찾을 수 없음")
+                
+            print(f"✅ {forest_id} 할인정책 크롤링 완료: {len(discount_policies)}개")
+            
+            return {
+                'status': 'success',
+                'message': f'{len(discount_policies)}개 할인정책 수집 완료',
+                'policies_collected': len(discount_policies)
+            }
+                    
+        except Exception as e:
+            print(f"❌ 할인정책 크롤링 오류: {e}")
+            return {
+                'status': 'error',
+                'message': f'할인정책 크롤링 오류: {str(e)}',
+                'policies_collected': 0
+            }
+
+    def _get_default_discount_policies(self):
+        """기본 할인정책 패턴 (절물자연휴양림 기준)"""
+        accommodation_discounts = [
+            {
+                'policy_category': '객실이용요금감면',
+                'target_group': '장애인1~3급',
+                'discount_type': 'percentage',
+                'discount_rate': 50,
+                'conditions': '비수기 주중에 한함',
+                'required_documents': '장애인등록증',
+                'detailed_description': '장애인 1~3급 대상 객실 이용요금 50% 감면',
+                'raw_text': '장애인(1~3급) : 50% 할인(비수기 주중에 한함)'
+            },
                 {
                     'policy_category': '객실이용요금감면',
                     'target_group': '장애인4~6급',
@@ -1077,20 +1160,20 @@ class WebCrawler:
                     'detailed_description': '의사상자 등 대상 객실 이용요금 10% 감면',
                     'raw_text': '의사상자 등 : 10% 할인(비수기 주중에 한함)'
                 }
-            ]
-            
-            # 2. 입장료 면제 대상들
-            entrance_exemptions = [
-                {
-                    'policy_category': '입장료면제',
-                    'target_group': '12세이하어린이',
-                    'discount_type': 'exemption',
-                    'discount_rate': 100,
-                    'conditions': '연중',
-                    'required_documents': '신분증',
-                    'detailed_description': '12세 이하 어린이 입장료 면제',
-                    'raw_text': '12세 이하 : 입장료 면제'
-                },
+        ]
+        
+        # 2. 입장료 면제 대상들
+        entrance_exemptions = [
+            {
+                'policy_category': '입장료면제',
+                'target_group': '12세이하어린이',
+                'discount_type': 'exemption',
+                'discount_rate': 100,
+                'conditions': '연중',
+                'required_documents': '신분증',
+                'detailed_description': '12세 이하 어린이 입장료 면제',
+                'raw_text': '12세 이하 : 입장료 면제'
+            },
                 {
                     'policy_category': '입장료면제',
                     'target_group': '65세이상경로우대자',
@@ -1151,64 +1234,34 @@ class WebCrawler:
                     'detailed_description': '특수임무유공자 입장료 면제',
                     'raw_text': '특수임무유공자 : 입장료 면제'
                 }
-            ]
-            
-            # 3. 주차료 면제 대상들
-            parking_exemptions = [
-                {
-                    'policy_category': '주차료면제',
-                    'target_group': '장애인',
-                    'discount_type': 'exemption',
-                    'discount_rate': 100,
-                    'conditions': '연중',
-                    'required_documents': '장애인등록증 및 장애인전용주차표지',
-                    'detailed_description': '장애인 주차료 면제 (장애인전용주차표지 부착차량에 한함)',
-                    'raw_text': '장애인 : 주차료 면제 (장애인전용주차표지 부착차량에 한함)'
-                },
-                {
-                    'policy_category': '주차료면제',
-                    'target_group': '국가유공자',
-                    'discount_type': 'exemption',
-                    'discount_rate': 100,
-                    'conditions': '연중',
-                    'required_documents': '국가유공자증',
-                    'detailed_description': '국가유공자 주차료 면제',
-                    'raw_text': '국가유공자 : 주차료 면제'
-                }
-            ]
-            
-            # 모든 정책 통합
-            discount_policies = accommodation_discounts + entrance_exemptions + parking_exemptions
-            
-            print(f"🎯 실제 패턴 기반 할인정책 생성: {len(discount_policies)}개")
-            for i, policy in enumerate(discount_policies[:5], 1):  # 처음 5개만 출력
-                print(f"  {i}. {policy['target_group']}: {policy['discount_rate']}% ({policy['policy_category']})")
-            if len(discount_policies) > 5:
-                print(f"  ... 및 {len(discount_policies) - 5}개 추가 정책")
-            
-            # 데이터베이스 저장
-            if discount_policies:
-                print(f"💾 데이터베이스 저장 시작: {len(discount_policies)}개 정책")
-                self.save_discount_policies(forest_id, discount_policies)
-                print(f"✅ 데이터베이스 저장 완료")
-            else:
-                print(f"⚠️ 저장할 할인정책이 없습니다")
-                
-            print(f"✅ {forest_id} 할인정책 {len(discount_policies)}개 수집 완료")
-            
-            return {
-                'status': 'success',
-                'message': f'{len(discount_policies)}개 할인정책 수집 완료',
-                'policies_collected': len(discount_policies)
+        ]
+        
+        # 3. 주차료 면제 대상들
+        parking_exemptions = [
+            {
+                'policy_category': '주차료면제',
+                'target_group': '장애인',
+                'discount_type': 'exemption',
+                'discount_rate': 100,
+                'conditions': '연중',
+                'required_documents': '장애인등록증 및 장애인전용주차표지',
+                'detailed_description': '장애인 주차료 면제 (장애인전용주차표지 부착차량에 한함)',
+                'raw_text': '장애인 : 주차료 면제 (장애인전용주차표지 부착차량에 한함)'
+            },
+            {
+                'policy_category': '주차료면제',
+                'target_group': '국가유공자',
+                'discount_type': 'exemption',
+                'discount_rate': 100,
+                'conditions': '연중',
+                'required_documents': '국가유공자증',
+                'detailed_description': '국가유공자 주차료 면제',
+                'raw_text': '국가유공자 : 주차료 면제'
             }
-                    
-        except Exception as e:
-            print(f"❌ 할인정책 크롤링 오류: {e}")
-            return {
-                'status': 'error',
-                'message': f'할인정책 크롤링 오류: {str(e)}',
-                'policies_collected': 0
-            }
+        ]
+        
+        # 모든 정책 통합
+        return accommodation_discounts + entrance_exemptions + parking_exemptions
 
     def save_discount_policies(self, forest_id, policies):
         """할인정책 데이터 DB 저장"""

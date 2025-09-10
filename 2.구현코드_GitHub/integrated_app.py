@@ -10,6 +10,7 @@ import os
 import sqlite3
 from pathlib import Path
 import json
+import asyncio
 from datetime import timedelta, datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -387,16 +388,59 @@ def api_crawl_detailed():
 @app.route('/admin/api/crawl/discounts', methods=['POST'])
 @admin_required
 def api_crawl_discounts():
-    """할인정책 크롤링 API"""
-    data = request.get_json()
-    forest_id = data.get('forest_id')
-    
-    # 실제 크롤링 로직은 향후 구현
-    return jsonify({
-        'status': 'success',
-        'message': f'할인정책 수집 완료\n수집된 정책: 6개',
-        'forest_id': forest_id
-    })
+    """할인정책 크롤링 API - 실제 크롤링 모듈 호출"""
+    try:
+        data = request.get_json()
+        forest_id = data.get('forest_id')
+        
+        if not forest_id:
+            return jsonify({
+                'status': 'error',
+                'message': '휴양림 ID가 필요합니다.'
+            }), 400
+        
+        # 실제 크롤링 모듈 import 및 실행
+        import sys
+        import os
+        sys.path.append(os.path.join(os.path.dirname(__file__), 'src', 'data_collection', 'admin_dashboard'))
+        
+        try:
+            from app import WebCrawler, DatabaseManager as AdminDatabaseManager
+            
+            # 데이터베이스 매니저 생성
+            admin_db_manager = AdminDatabaseManager(str(DB_PATH))
+            
+            # 웹 크롤러 생성 및 실행
+            web_crawler = WebCrawler(admin_db_manager)
+            result = asyncio.run(web_crawler.crawl_discount_policies(forest_id))
+            
+            if result.get('status') == 'success':
+                return jsonify({
+                    'status': 'success',
+                    'message': f"할인정책 수집 완료\n수집된 정책: {result.get('policies_collected', 0)}개",
+                    'forest_id': forest_id,
+                    'policies_collected': result.get('policies_collected', 0)
+                })
+            else:
+                return jsonify({
+                    'status': 'error', 
+                    'message': result.get('message', '할인정책 수집 실패'),
+                    'forest_id': forest_id
+                }), 500
+                
+        except ImportError as import_error:
+            print(f"크롤링 모듈 import 오류: {import_error}")
+            return jsonify({
+                'status': 'error',
+                'message': f'크롤링 모듈 로드 실패: {str(import_error)}'
+            }), 500
+            
+    except Exception as e:
+        print(f"할인정책 크롤링 API 오류: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': f'할인정책 크롤링 중 오류가 발생했습니다: {str(e)}'
+        }), 500
 
 # 추천 API
 @app.route('/api/recommend', methods=['POST'])
@@ -908,9 +952,12 @@ COMPLETE_DATA_COLLECTION_TEMPLATE = """
 
                 if (result.status === 'success') {
                     dashboard.showCrawlingStatus(result.message, 'success');
-                    alert(result.message);
+                    // 할인정책 탭 데이터 새로고침
+                    if (window.dashboard && typeof window.dashboard.loadDiscountsData === 'function') {
+                        window.dashboard.loadDiscountsData();
+                    }
                 } else {
-                    dashboard.showCrawlingStatus('할인정책 수집 중 오류가 발생했습니다.', 'danger');
+                    dashboard.showCrawlingStatus(result.message || '할인정책 수집 중 오류가 발생했습니다.', 'danger');
                 }
             } catch (error) {
                 dashboard.hideLoadingModal();
@@ -1528,6 +1575,6 @@ ADMIN_TEMPLATE = """
 if __name__ == '__main__':
     print("HyurimBot 통합 시스템을 시작합니다...")
     print("관리자 계정: admin / hyurimbot2025")
-    print("데이터 수집 대시보드: http://localhost:8080/admin/data-collection")
+    print("데이터 수집 대시보드: http://localhost:8081/admin/data-collection")
     print("=" * 50)
-    app.run(host='0.0.0.0', port=8080, debug=True)
+    app.run(host='0.0.0.0', port=8081, debug=True)

@@ -1,32 +1,43 @@
-# 🏔️ HyurimBot - RAG 기반 자연휴양림 AI 추천 서비스
+# 🌲 HyurimBot AI 자연휴양림 추천 시스템
 
-[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io)
-[![HuggingFace](https://img.shields.io/badge/🤗%20Hugging%20Face-yellow)](https://huggingface.co)
 [![FAISS](https://img.shields.io/badge/FAISS-blue)](https://github.com/facebookresearch/faiss)
+[![Korean BERT](https://img.shields.io/badge/Korean%20BERT-green)](https://huggingface.co/jhgan/ko-sroberta-multitask)
 
-> **RAG (Retrieval-Augmented Generation) 기술을 활용한 개인 맞춤형 자연휴양림 추천 서비스**
+> **AI 벡터 검색과 개인화 추천을 통한 자연휴양림 숙박시설 추천 시스템**
 
-## 🎯 프로젝트 개요
-- **개발기간**: 2025.07.07 ~ 2025.08.29 (8주)
-- **핵심기술**: RAG, FAISS 벡터검색, HuggingFace LLM, Streamlit UI
-- **데이터**: 전국 자연휴양림 공공데이터 + 웹크롤링 상세정보
-- **목표**: 심사기준 100점 만점을 위한 완벽한 AI 추천시스템 구현
+## 📋 프로젝트 개요
 
-## 🚀 주요 기능
+**HyurimBot**은 전국 199개 자연휴양림의 숙박시설 정보를 수집하고, AI 기반 벡터 검색과 개인화 선호도 매칭을 통해 사용자에게 최적의 숙박시설을 추천하는 종합 시스템입니다.
 
-### ✨ 핵심 기능
-- 🔍 **지능형 검색**: 자연어 쿼리를 통한 의미 기반 휴양림 검색
-- 🎯 **개인 맞춤 추천**: 사용자 선호도(지역, 예산, 인원) 기반 추천
-- 💰 **실제 체감가 계산**: 할인정책, 지역상품권 페이백 반영
-- 📝 **AI 설명문 생성**: KoBART/mT5 기반 휴양림 상세 소개문
-- 📊 **비교 분석**: 여러 휴양림 시설, 가격, 정책 종합 비교
+### 🎯 주요 기능
 
-### 🔧 기술적 특징  
-- **RAG 아키텍처**: 벡터검색 + LLM 생성의 완벽한 결합
-- **실시간 처리**: FAISS 기반 고속 유사도 검색 (<2초)
-- **무료 기술스택**: 100% 오픈소스, 추가 비용 없는 구현
-- **확장 가능 설계**: 모듈화된 구조로 기능 확장 용이
+- **🕷️ 데이터 수집 시스템**: Playwright 기반 자동 웹 크롤링
+- **🧠 AI 추천 엔진**: 한국어 BERT + FAISS 벡터 검색
+- **👤 개인화 매칭**: 사용자 프로필 기반 선호도 분석
+- **🏗️ 관리자 대시보드**: 데이터 수집 및 관리 웹 인터페이스
+- **📱 사용자 앱**: Streamlit 기반 직관적 추천 서비스
+- **💰 할인 계산**: 다자녀, 장애인, 국가유공자 등 할인 정책 반영
+
+## 🏗️ 시스템 아키텍처
+
+```
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│   웹 크롤링     │ -> │    SQLite DB     │ -> │  벡터 임베딩    │
+│  (Playwright)   │    │  (정규화 14테이블) │    │ (Korean BERT)   │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+                                 |
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│ 관리자 대시보드  │ <- │  공유 데이터베이스 │ -> │  AI 추천 엔진   │
+│   (Flask)       │    │   Connection     │    │    (FAISS)      │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+                                 |
+                       ┌──────────────────┐
+                       │   사용자 앱      │
+                       │  (Streamlit)     │
+                       └──────────────────┘
+```
 
 ## 📁 프로젝트 구조
 ```

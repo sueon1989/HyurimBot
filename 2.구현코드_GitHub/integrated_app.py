@@ -14,8 +14,23 @@ import asyncio
 from datetime import timedelta, datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 
-# 기본 추천 엔진 import
-from test_basic_recommendation import BasicRecommendationEngine
+# AI 추천 엔진 import
+try:
+    from src.recommendation_engine.models.similarity_engine import build_search_index, HyurimBotVectorSearchEngine
+    USE_VECTOR_SEARCH = True
+    print("✅ HyurimBot 벡터 검색 엔진 로드 완료")
+except ImportError as e:
+    print(f"⚠️ 벡터 검색 엔진 로드 실패: {e}")
+    USE_VECTOR_SEARCH = False
+    print("🔄 기본 추천 엔진 사용")
+
+# 기본 추천 엔진 import (fallback용)
+try:
+    from test_basic_recommendation import BasicRecommendationEngine
+    print("✅ 기본 추천 엔진 로드 완료")
+except ImportError as e:
+    print(f"❌ 기본 추천 엔진 로드 실패: {e}")
+    BasicRecommendationEngine = None
 
 # Flask 애플리케이션 생성
 app = Flask(__name__)
@@ -38,12 +53,30 @@ ADMIN_CREDENTIALS = {
 
 # 추천 엔진 인스턴스
 recommendation_engine = None
+vector_search_engine = None
 
 def init_recommendation_engine():
-    """추천 엔진 초기화"""
-    global recommendation_engine
+    """AI 추천 엔진 초기화"""
+    global recommendation_engine, vector_search_engine
+    
+    if USE_VECTOR_SEARCH and not vector_search_engine:
+        try:
+            print("🚀 HyurimBot 벡터 검색 엔진 초기화 중...")
+            vector_search_engine = build_search_index(str(DB_PATH), force_rebuild=False)
+            print("✅ 벡터 검색 엔진 초기화 완료")
+            return
+        except Exception as e:
+            print(f"❌ 벡터 검색 엔진 초기화 실패: {e}")
+            print("🔄 기본 추천 엔진으로 폴백")
+    
+    # 폴백: 기본 추천 엔진 사용
     if not recommendation_engine:
-        recommendation_engine = BasicRecommendationEngine(str(DB_PATH))
+        if BasicRecommendationEngine is not None:
+            recommendation_engine = BasicRecommendationEngine(str(DB_PATH))
+            print("✅ 기본 추천 엔진 초기화 완료")
+        else:
+            print("❌ 기본 추천 엔진을 사용할 수 없습니다")
+            recommendation_engine = None
 
 # 인증 데코레이터
 def login_required(f):
@@ -661,10 +694,10 @@ def save_discount_policies_to_integrated_db(forest_id, policies):
         print(f"통합 DB 저장 중 오류: {e}")
         raise e
 
-# 추천 API
+# 추천 API - 새로운 벡터 검색 엔진 사용
 @app.route('/api/recommend', methods=['POST'])
 def recommend():
-    """AI 추천 API"""
+    """AI 추천 API - BERT 임베딩 기반 의미적 검색"""
     init_recommendation_engine()
     
     data = request.get_json()
@@ -672,16 +705,79 @@ def recommend():
     preferences = data.get('preferences', {})
     
     try:
-        recommendations = recommendation_engine.get_recommendations(query, preferences)
-        return jsonify({
-            'success': True,
-            'recommendations': recommendations,
-            'query': query
-        })
+        # 벡터 검색 엔진 사용
+        if USE_VECTOR_SEARCH and vector_search_engine:
+            print(f"🎯 벡터 검색 실행: '{query}'")
+            
+            # 필터 조건 구성
+            filters = {}
+            if 'capacity' in preferences:
+                filters['capacity_min'] = preferences['capacity']
+            if 'price_max' in preferences:
+                filters['price_max'] = preferences['price_max']
+            if 'location' in preferences:
+                filters['location'] = preferences['location']
+            
+            # 벡터 검색 실행
+            vector_results = vector_search_engine.search(
+                query=query,
+                top_k=preferences.get('top_k', 5),
+                filters=filters,
+                score_threshold=0.3
+            )
+            
+            # 결과 포맷 변환 (기존 UI와 호환)
+            formatted_results = []
+            for result in vector_results:
+                formatted_result = {
+                    'accommodation_id': result.get('accommodation_id'),
+                    'facility_name': result.get('facility_name', ''),
+                    'forest_name': result.get('forest_name', ''),
+                    'facility_type': result.get('facility_type', ''),
+                    'capacity_standard': result.get('capacity_standard', 0),
+                    'price_off_weekday': result.get('price_off_weekday', 0),
+                    'amenities': result.get('amenities', ''),
+                    'sido': result.get('sido', ''),
+                    'address': result.get('address', ''),  # 위치 정보를 위한 address 필드 추가
+                    'similarity_score': result.get('similarity_score', 0),
+                    'popularity_score': result.get('popularity_score', result.get('similarity_score', 0)),  # 기본 추천 엔진과 호환
+                    'recommendation_reason': result.get('recommendation_reason', ''),
+                    # UI 호환성을 위한 추가 필드
+                    'main_facilities': result.get('amenities', ''),
+                    'phone': '',  # 추후 추가 가능
+                    'homepage_url': '',  # 추후 추가 가능
+                    'score': result.get('similarity_score', 0)
+                }
+                formatted_results.append(formatted_result)
+            
+            return jsonify({
+                'success': True,
+                'recommendations': formatted_results,
+                'query': query,
+                'engine': 'vector_search',
+                'total_results': len(formatted_results)
+            })
+        
+        # 폴백: 기본 추천 엔진 사용
+        else:
+            print(f"🔄 기본 추천 엔진 사용: '{query}'")
+            recommendations = recommendation_engine.get_recommendations(query, preferences)
+            return jsonify({
+                'success': True,
+                'recommendations': recommendations,
+                'query': query,
+                'engine': 'basic_search'
+            })
+            
     except Exception as e:
+        print(f"❌ 추천 API 오류: {e}")
+        import traceback
+        traceback.print_exc()
+        
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': str(e),
+            'engine': 'error'
         }), 500
 
 # 템플릿 정의 - 완전한 원본 dashboard.html을 기반으로 한 COMPLETE_DATA_COLLECTION_TEMPLATE
@@ -1296,6 +1392,7 @@ MAIN_TEMPLATE = """
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🌲 HyurimBot - 자연휴양림 AI 추천</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
@@ -1383,12 +1480,172 @@ MAIN_TEMPLATE = """
             margin-top: 40px;
             text-align: left;
         }
+        
+        .search-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .search-header h3 {
+            margin: 0 0 10px 0;
+        }
+        
+        .engine-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        
+        .engine-badge.vector {
+            background: rgba(76, 175, 80, 0.2);
+            border: 2px solid #4CAF50;
+        }
+        
+        .engine-badge.basic {
+            background: rgba(255, 193, 7, 0.2);
+            border: 2px solid #FFC107;
+        }
+        
+        .search-info {
+            margin: 10px 0 0 0;
+            opacity: 0.9;
+            font-size: 0.9em;
+        }
+        
         .result-item {
             background: #f8f9fa;
-            padding: 20px;
-            margin: 15px 0;
+            padding: 25px;
+            margin: 20px 0;
             border-radius: 15px;
             border-left: 5px solid #4CAF50;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: all 0.3s;
+        }
+        
+        .result-item.enhanced {
+            background: white;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .result-item.enhanced:hover {
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            transform: translateY(-2px);
+        }
+        
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #e0e0e0;
+            padding-bottom: 15px;
+        }
+        
+        .result-header h4 {
+            margin: 0;
+            color: #333;
+            font-size: 1.2em;
+        }
+        
+        .score-badge {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: bold;
+            min-width: 60px;
+            text-align: center;
+        }
+        
+        .result-details {
+            margin: 15px 0;
+        }
+        
+        .detail-row {
+            display: flex;
+            margin: 8px 0;
+            align-items: flex-start;
+        }
+        
+        .detail-label {
+            font-weight: bold;
+            min-width: 100px;
+            color: #666;
+            margin-right: 10px;
+            flex-shrink: 0;
+        }
+        
+        .detail-value {
+            color: #333;
+            flex-grow: 1;
+        }
+        
+        .detail-value.price {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+        
+        .detail-row.amenities .detail-value {
+            color: #666;
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+        
+        .recommendation-reason {
+            background: linear-gradient(45deg, #E8F5E8, #F1F8E9);
+            border: 1px solid #C8E6C9;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 15px 0;
+            color: #2E7D32;
+            font-style: italic;
+        }
+        
+        .recommendation-reason i {
+            color: #FFA000;
+            margin-right: 8px;
+        }
+        
+        .result-actions {
+            margin-top: 15px;
+            text-align: right;
+        }
+        
+        .homepage-link {
+            background: linear-gradient(45deg, #2196F3, #1976D2);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 25px;
+            text-decoration: none;
+            font-size: 0.9em;
+            transition: all 0.3s;
+        }
+        
+        .homepage-link:hover {
+            background: linear-gradient(45deg, #1976D2, #1565C0);
+            color: white;
+            text-decoration: none;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(33, 150, 243, 0.4);
+        }
+        
+        .no-results {
+            text-align: center;
+            background: #fff3cd;
+            border-color: #ffc107;
+            color: #856404;
+        }
+        
+        .no-results h4 {
+            margin-bottom: 15px;
         }
         .loading {
             display: none;
@@ -1459,21 +1716,95 @@ MAIN_TEMPLATE = """
                 loading.style.display = 'none';
                 
                 if (data.success && data.recommendations.length > 0) {
-                    results.innerHTML = '<h3>🎯 AI 추천 결과</h3>';
+                    // 검색 엔진 정보 표시
+                    const engineBadge = data.engine === 'vector_search' 
+                        ? '<span class="engine-badge vector">🧠 AI 벡터 검색</span>' 
+                        : '<span class="engine-badge basic">🔍 기본 검색</span>';
+                    
+                    results.innerHTML = `
+                        <div class="search-header">
+                            <h3>🎯 AI 추천 결과</h3>
+                            ${engineBadge}
+                            <p class="search-info">"${query}"에 대한 ${data.recommendations.length}개 추천 결과</p>
+                        </div>
+                    `;
+                    
                     data.recommendations.forEach((item, index) => {
+                        // 가격 정보 포맷팅
+                        const priceInfo = item.price_off_weekday 
+                            ? `${item.price_off_weekday.toLocaleString()}원/박` 
+                            : '가격 정보 없음';
+                        
+                        // 유사도 점수 포맷팅
+                        const similarityScore = item.similarity_score 
+                            ? (item.similarity_score * 100).toFixed(1) + '%'
+                            : item.score 
+                            ? (item.score * 100).toFixed(1) + '%' 
+                            : 'N/A';
+                        
+                        // 추천 근거 (벡터 검색에서만)
+                        const recommendationReason = item.recommendation_reason 
+                            ? `<div class="recommendation-reason">
+                                 <i class="fas fa-lightbulb"></i> ${item.recommendation_reason}
+                               </div>` 
+                            : '';
+                        
                         results.innerHTML += `
-                            <div class="result-item">
-                                <h4>${index + 1}. ${item.forest_name}</h4>
-                                <p><strong>위치:</strong> ${item.sido}</p>
-                                <p><strong>시설:</strong> ${item.main_facilities || '정보 없음'}</p>
-                                <p><strong>연락처:</strong> ${item.phone || '정보 없음'}</p>
-                                <p><strong>추천 점수:</strong> ${item.score ? (item.score * 100).toFixed(1) + '%' : 'N/A'}</p>
-                                ${item.homepage_url ? `<p><a href="${item.homepage_url}" target="_blank">🔗 홈페이지</a></p>` : ''}
+                            <div class="result-item enhanced">
+                                <div class="result-header">
+                                    <h4>${index + 1}. ${item.facility_name || item.forest_name}</h4>
+                                    <div class="score-badge">${similarityScore}</div>
+                                </div>
+                                
+                                <div class="result-details">
+                                    <div class="detail-row">
+                                        <span class="detail-label">🏛️ 휴양림:</span>
+                                        <span class="detail-value">${item.forest_name}</span>
+                                    </div>
+                                    <div class="detail-row">
+                                        <span class="detail-label">📍 위치:</span>
+                                        <span class="detail-value">${item.address || '정보 없음'}</span>
+                                    </div>
+                                    <div class="detail-row">
+                                        <span class="detail-label">🏠 시설유형:</span>
+                                        <span class="detail-value">${item.facility_type || '정보 없음'}</span>
+                                    </div>
+                                    <div class="detail-row">
+                                        <span class="detail-label">👥 수용인원:</span>
+                                        <span class="detail-value">${item.capacity_standard ? item.capacity_standard + '명' : '정보 없음'}</span>
+                                    </div>
+                                    <div class="detail-row">
+                                        <span class="detail-label">💰 가격:</span>
+                                        <span class="detail-value price">${priceInfo}</span>
+                                    </div>
+                                    ${item.amenities ? `
+                                    <div class="detail-row amenities">
+                                        <span class="detail-label">🏪 편의시설:</span>
+                                        <span class="detail-value">${item.amenities}</span>
+                                    </div>
+                                    ` : ''}
+                                </div>
+                                
+                                ${recommendationReason}
+                                
+                                ${item.homepage_url ? `
+                                <div class="result-actions">
+                                    <a href="${item.homepage_url}" target="_blank" class="homepage-link">
+                                        🔗 홈페이지 보기
+                                    </a>
+                                </div>
+                                ` : ''}
                             </div>
                         `;
                     });
                 } else {
-                    results.innerHTML = '<div class="result-item">추천할 수 있는 휴양림을 찾지 못했습니다. 다른 키워드로 검색해보세요.</div>';
+                    results.innerHTML = `
+                        <div class="result-item no-results">
+                            <h4>🔍 검색 결과가 없습니다</h4>
+                            <p>추천할 수 있는 숙박시설을 찾지 못했습니다.</p>
+                            <p>다른 키워드로 검색해보세요. (예: "가족 펜션", "커플 휴양관", "넓은 객실")</p>
+                        </div>
+                    `;
                 }
             } catch (error) {
                 loading.style.display = 'none';

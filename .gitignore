@@ -1,0 +1,76 @@
+# CLAUDE.md 파일 제외
+CLAUDE.md
+
+# Python 캐시 파일
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# 가상환경
+venv/
+env/
+ENV/
+2.구현코드_GitHub/venv/
+
+# 데이터베이스 파일 (개발용)
+*.db
+*.sqlite
+*.sqlite3
+
+# 로그 파일
+*.log
+logs/
+
+# 환경설정 파일
+.env
+.env.local
+.env.production
+
+# IDE 설정
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 시스템 파일
+.DS_Store
+Thumbs.db
+
+# 임시 파일
+*.tmp
+*.temp
+temp/
+tmp/
+
+# 빌드 파일
+build/
+dist/
+*.egg-info/
+
+# 노드 모듈 (혹시 포함된 경우)
+node_modules/
+
+# 테스트 커버리지
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# PyTorch 모델
+*.pth
+*.pt
+
+# FAISS 인덱스
+*.faiss
+*.index
+
+# 데이터 파일 (용량이 큰 경우)
+data/raw/*.json
+data/processed/*.csv
+
+# 브라우저 캐시
+.playwright-mcp/

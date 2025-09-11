@@ -44,6 +44,7 @@ sqlalchemy>=2.0.0               # ORM (선택사항)
 streamlit>=1.28.0               # 웹앱 프레임워크
 streamlit-option-menu>=0.3.6    # 메뉴 컴포넌트
 streamlit-aggrid>=0.3.4         # 데이터 그리드
+flask>=2.3.0                    # Flask 웹 프레임워크
 
 # 시각화
 plotly>=5.15.0                  # 인터랙티브 차트
